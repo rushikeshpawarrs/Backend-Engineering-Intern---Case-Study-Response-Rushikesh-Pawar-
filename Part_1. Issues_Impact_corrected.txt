@@ -1,0 +1,39 @@
+Issues:
+1. No Proper data validation
+2. SKU uniqueness is not checked before creating any new product
+3. Commit() calls should be used once only, it is not efficient to use twice it breaks the atomicity
+4. DB interaction should be put between a try catch block 
+
+Impact:
+1. With no proper data validation, the application can crach with a TypeError.
+2. By not checking the SKU, duplicate products with the same SKU can be created in the DB, it can give false inventory counts
+3. It simply can break the ACID properties that should be followed by DB, its a good practice to Commit only when a full transaction is completed
+4. Try catch block keeps our app in a reliable state even if app generates error
+
+Correct Code:
+
+@app.route('/api/products', methods=['POST'])
+def create_product():
+    data = request.get_json()
+
+    # Create product
+    product = Product(
+        name=data.get('name'),
+        sku=data.get('sku'),
+        price=data.get('price')
+    )
+    db.session.add(product)
+    db.session.flush()   # get product.id before commit
+
+    # Create inventory
+    inventory = Inventory(
+        product_id=product.id,
+        warehouse_id=data.get('warehouse_id'),
+        quantity=data.get('initial_quantity', 0)  # default 0 if not given
+    )
+    db.session.add(inventory)
+
+    # Commit once
+    db.session.commit()
+    #jsonify should always be a good practive, to avoid any error
+    return jsonify({"message": "Product created", "product_id": product.id})
