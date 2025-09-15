@@ -1,0 +1,113 @@
+Part_3. API_Implementaion_JS_Node_Express
+
+API>>>
+
+// Define the API endpoint for fetching low-stock alerts for a given company
+app.get('/api/companies/:company_id/alerts/low-stock', (req, res) => {
+    // Extract the company ID from the URL parameters and convert it to an integer
+    const companyId = parseInt(req.params.company_id);
+
+    // --- Business Rule: Validate company existence ---
+    // Check if the company with the given ID exists in our mock database
+    const company = findCompanyById(companyId);
+    // If the company is not found, send a 404 Not Found response
+    if (!company) {
+        return res.status(404).json({ message: 'Company not found.' });
+    }
+
+    // Initialize an array to store all identified low-stock alerts
+    const alerts = [];
+    // Initialize a counter for the total number of alerts
+    let totalAlerts = 0;
+
+    // --- Business Rule: Only alert for products with recent sales activity ---
+    // Calculate the cutoff date for "recent" sales activity (e.g., last 60 days)
+    const recentSalesCutoff = new Date();
+    recentSalesCutoff.setDate(recentSalesCutoff.getDate() - 60); // Subtract 60 days from today
+
+    // --- Business Rule: Must handle multiple warehouses per company ---
+    // Get all warehouses associated with the given company ID
+    const companyWarehouses = findWarehousesByCompanyId(companyId);
+
+    // If no warehouses are found for the company, return an empty alert list
+    if (companyWarehouses.length === 0) {
+        return res.status(200).json({ alerts: [], total_alerts: 0, message: "No warehouses found for this company." });
+    }
+
+    // Iterate over each warehouse belonging to the company
+    companyWarehouses.forEach(warehouse => {
+        // Filter the mock inventory to get only items for the current warehouse
+        const warehouseInventory = mockInventory.filter(item => item.warehouse_id === warehouse.warehouse_id);
+
+        // Iterate over each inventory item within the current warehouse
+        warehouseInventory.forEach(inventoryItem => {
+            // Find the full product details for the current inventory item
+            const product = findProductById(inventoryItem.product_id);
+
+            // Skip this item if the product doesn't exist or doesn't have a product_type defined
+            if (!product || !product.product_type) {
+                return; // Move to the next inventory item
+            }
+
+            // Check if the last sold date for this item is older than our recent sales cutoff
+            if (inventoryItem.last_sold_date < recentSalesCutoff) {
+                return; // Not recent activity, so skip this item for alerts
+            }
+
+            // --- Business Rule: Low stock threshold varies by product type ---
+            // Determine the low stock threshold based on the product's type
+            const threshold = getProductThreshold(product.product_type);
+
+            // Check if the current quantity in inventory is at or below the defined threshold
+            if (inventoryItem.quantity <= threshold) {
+                // If it's low stock and has recent activity, increment the total alerts count
+                totalAlerts++;
+
+                // --- Business Rule: Include supplier information for reordering ---
+                // Find the supplier details for the product's main supplier
+                const supplier = findSupplierById(product.main_supplier_id);
+
+                // Calculate a simple 'days until stockout' based on quantity and product type
+                let daysUntilStockout;
+                if (inventoryItem.quantity === 0) {
+                    daysUntilStockout = 0; // Already out of stock
+                } else if (product.product_type === 'Perishable') {
+                    daysUntilStockout = 2; // Perishable items might stock out faster
+                } else {
+                    daysUntilStockout = 5; // A general assumption for other product types
+                }
+                
+                // Add the detailed alert object to our alerts array
+                alerts.push({
+                    product_id: product.product_id,
+                    product_name: product.product_name,
+                    sku: product.sku,
+                    warehouse_id: warehouse.warehouse_id,
+                    warehouse_name: warehouse.warehouse_name,
+                    current_stock: inventoryItem.quantity,
+                    threshold: threshold,
+                    days_until_stockout: daysUntilStockout,
+                    // Include supplier info if available, otherwise null
+                    supplier: supplier ? {
+                        id: supplier.supplier_id,
+                        name: supplier.supplier_name,
+                        contact_email: supplier.contact_email
+                    } : null
+                });
+            }
+        });
+    });
+
+    // Send the final JSON response containing all alerts and the total count
+    res.json({
+        alerts: alerts,
+        total_alerts: totalAlerts
+    });
+});
+
+
+
+Handling Edge Cases:
+1. The API correctly returns an empty alert list and a message if a company has no warehouses.
+2. If all items are above threshold, it correctly returns an empty alerts array.
+3. If there are some missing data, that is also handled properly.
