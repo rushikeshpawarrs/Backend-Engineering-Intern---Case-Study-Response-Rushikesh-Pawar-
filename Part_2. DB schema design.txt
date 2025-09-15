@@ -1,0 +1,49 @@
+Text Description of DB Schema>>>
+Entities(Tables) and Attributes(Columns)
+1. Companies:
+company_id (Primary Key)
+company_name
+
+2. Products:
+product_id (Primary Key)
+product_name
+sku (Unique Key)
+price
+is_bundle
+
+3. Warehouses:
+warehouse_id (Primary Key)
+warehouse_name
+company_id (Foreign Key)
+
+4. Inventory:
+product_id (Primary Key, Foreign Key)
+warehouse_id (Primary Key, Foreign Key)
+quantity
+
+5. BundledProducts:
+bundle_id (Primary Key, Foreign Key)
+component_id (Primary Key, Foreign Key)
+quantity
+
+Relationships
+1. Companies and Warehouses:
+A Company has a one-to-many relationship with Warehouses.
+
+2. Products and Inventory:
+Products and Warehouses have a many-to-many relationship through the Inventory table.
+
+3. Products and BundledProducts:
+The Products table has a many-to-many self-referencing relationship through the BundledProducts table.
+
+
+Gaps I identified:
+1. Is the warehouse is shared between multiple companies or every company has there own warehouses
+2. What specific information should we store when inventory level changes
+3. What to do with bundles should be clearly explained by the product team.
+
+
+Why I choose this design:
+In the given time and with my knowledge, I have created this DB Schema, there is a big scope of optimization here, and my knowledge will grow through learnig.
+1. Primary keys give each record a unique ID, and foreign keys link related records across different tables, to maintain data consistentency in the DB.
+2. I made sure each product has a unique SKU to prevent errors and ensure we don't have duplicate products
